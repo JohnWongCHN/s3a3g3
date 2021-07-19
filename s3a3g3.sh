@@ -27,20 +27,19 @@
  # @Author: John Wong
  # @Date: 2021-06-01 11:34:15
  # @LastEditors: John Wong
- # @LastEditTime: 2021-07-19 21:28:29
+ # @LastEditTime: 2021-07-19 22:38:29
  # @FilePath: /s3a3g3/s3a3g3.sh
  # @Desc: Description
- # @Version: v0.2
+ # @Version: v0.3
 ###
 
 ### Terminal settings ###
 set -o errexit # Script exists on first failure, aka set -e
 # set -o undeclared # Script exists on use undeclared variables, aka set -u
-set -u
 set -o xtrace # For debugging purpose, aka set -x
 
 ### Global Variables ###
-declare SCRIPT_VERSION='v0.2'
+declare readonly SCRIPT_VERSION='v0.3'
 declare RESTART_FLAG=1
 declare OS_TYPE='unknow'
 declare OS_VER='unknow'
@@ -48,16 +47,16 @@ declare OS_VER_LIKE='unknow'
 declare OS_PRETTY_NAME='unknow'
 # 操作日志
 declare LOG_FILE="$(basename $0 .sh).log"
-declare BASH_HISTORY_SIZE=10000
-declare BASH_TMOUT=600
+declare readonly BASH_HISTORY_SIZE=10000
+declare readonly BASH_TMOUT=600
 # 备份目录
-declare BACKUP_DIR_NAME="$(basename $0 .sh)-backup"
+declare readonly BACKUP_DIR_NAME="$(basename $0 .sh)-backup"
 # 复原命令
-declare RECOVER_COMMANDS="$(basename $0 .sh)-backup/recover_commands.sh"
+declare readonly RECOVER_COMMANDS="$(basename $0 .sh)-backup/recover_commands.sh"
 # 临时文件
-declare TMPFILE=$(mktemp)
+declare readonly TMPFILE=$(mktemp)
 # 原文件
-declare -a ORIGIN_FILEPATHS=(
+declare -a readonly ORIGIN_FILEPATHS=(
     "/etc/pam.d/system-auth"
     "/etc/pam.d/common-password"
     "~/.ssh/authorized_keys"
@@ -669,17 +668,25 @@ function disable_telnet_login() {
     fi
 }
 
-function version() {
+function help() {
     ###
-    # @description: 打印版本信息
-    # @param {*}
-    # @return {*}
+     # @description: 打印脚本帮助
+     # @param {*}
+     # @return {*}
     ###    
+    declare readonly info = "
+等保3级基线配置脚本 - by John Wong (john-wong@outlook.com)
 
-    printf "@Author: John Wong"
-    printf "@Desc: 等保3级，基线配置脚本"
-    printf "@Version: ${SCRIPT_VERSION}"
+s3a3g3 version: ${SCRIPT_VERSION}
+Usage: s3a3g3.sh [-?hba]
 
+Options:
+  -?,-h,--help        : this help
+  -r,--recovery       : recover all the changes
+  -b,--backup         : backup configure files
+  -a,--apply          : apply settings
+"
+    printf ${info}
 }
 
 function main(){
@@ -688,71 +695,38 @@ function main(){
      # @param {*}
      # @return {*}
     ###
-
-    # Save screen
-    tput smcup
-
-    # Display menu until selection == 0
-    while [[ $REPLY != 0 ]]; do
-      echo -n ${BG_BLUE}${FG_WHITE}
-      clear
-
-cat << EOF
-Please Select:
-
-    1: All protective
-    2: Restore files
-    v: Print version
-    0: Quit
-EOF
-
-      read -p "Enter selection [0-2] > " selection
-
-      # Clear area beneath menu
-      tput cup 10 0
-      echo -n ${BG_BLACK}${FG_GREEN}
-      tput ed
-      tput cup 11 0
-
-      # Act on selection
-      case $selection in
-        1)
-            get_os_type
-            backup
-            password
-            limit_su
-            remote_login
-            set_bash_history_tmout
-            limit_system_files
-            umask_profile
-            immutable_user_conf_file
-            restart_ssh
-            ;;
-        2)  
-            restore
-            ;;
-        v)  
-            version
-            ;;
-        0)  
-            break
-            ;;
-        *)  
-            echo "Invalid entry."
-            ;;
-      esac
-      printf "\n\nPress any key to continue."
-      read -n 1
-    done
-
-    # Restore screen
-    tput rmcup
-    echo "Program terminated."
-
+    get_os_type
+    if [ $# == 1 ]; then
+        case $1 in
+            "-h"| "-?"|"--help")
+                help
+                ;;
+            "-r"|"--recovery")
+                recovery
+                ;;
+            "-b"|"--backup")
+                backup
+                ;;
+            "-a"|"--apply")
+                backup
+                password_complexity
+                limit_su
+                secure_sshd
+                set_bash_history_tmout
+                limit_system_files
+                umask_profile
+                immutable_user_conf_file
+                drop_risky_file
+                disable_telnet_login
+                ;;
+        esac
+    else
+        help
+    fi
 }
 
 
 ### main entry
 trap 'rm ${TMPFILE}' err exit
-trap recover err exit
+trap recovery err exit
 main
