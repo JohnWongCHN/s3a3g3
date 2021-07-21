@@ -27,10 +27,10 @@
  # @Author: John Wong
  # @Date: 2021-06-01 11:34:15
  # @LastEditors: John Wong
- # @LastEditTime: 2021-07-21 14:27:13
+ # @LastEditTime: 2021-07-21 16:45:44
  # @FilePath: /s3a3g3/s3a3g3.sh
  # @Desc: Description
- # @Version: v0.2
+ # @Version: v0.3
 ###
 
 ### Terminal settings ###
@@ -40,7 +40,7 @@ set -o nounset # Script exists on use nounset variables, aka set -u
 # set -o xtrace # For debugging purpose, aka set -x
 
 ### Global Variables ###
-declare readonly SCRIPT_VERSION='v0.2'
+declare readonly SCRIPT_VERSION='v0.3'
 declare RESTART_FLAG=1
 declare OS_TYPE='unknow'
 declare OS_VER='unknow'
@@ -70,6 +70,8 @@ declare -a readonly ORIGIN_FILEPATHS=(
     "/etc/pam.d/su"
     "/etc/login.defs"
     "/etc/security/pwquality.conf"
+    "/etc/sysctl.conf"
+    "/etc/security/limits.conf"
 )
 
 function log() {
@@ -330,6 +332,16 @@ function password_complexity(){
         exit 1
     fi
 
+    sed -ri "s/^(password.*sufficient.*pam_unix\.so)(.*)(remember=.?.?\s?)(.*)/\1\2\4/g" ${config} > /dev/null
+    sed -ri "s/^(password.*sufficient.*pam_unix\.so)(.*)$/\1\2 remember=5/g" ${config}
+    if [ $? == 0 ];then
+        log "SUCCESS" "Password repeat times: remember=5"
+    else
+        log "ERROR" "Failed to set password repeat times..."
+        exit 1
+    fi
+
+
     sed -ri "s/(PASS_MAX_DAYS\s*)([0-9]*)/\190/g" /etc/login.defs
     if [ $? == 0 ] ;then
         log "SUCCESS" "login.defs: set PASS_MAX_DAYS 90"
@@ -342,6 +354,13 @@ function password_complexity(){
         log "SUCCESS" "login.defs: set PASS_MIN_DAYS 6"
     else
         log "ERROR" "login.defs: failed to set PASS_MIN_DAYS 6"
+    fi
+
+    sed -ri "s/(PASS_MIN_LEN\s*)([0-9]*)/\16/g" /etc/login.defs
+    if [ $? == 0 ] ;then
+        log "SUCCESS" "login.defs: set PASS_MIN_LEN 6"
+    else
+        log "ERROR" "login.defs: failed to set PASS_MIN_LEN 6"
     fi
 
     sed -ri "s/(PASS_WARN_AGE\s*)([0-9]*)/\130/g" /etc/login.defs
@@ -544,7 +563,7 @@ function limit_system_files() {
     for file in /etc/rc0.d /etc/rc1.d /etc/rc2.d /etc/rc3.d /etc/rc4.d /etc/rc5.d /etc/rc6.d /etc/rc.d/init.d
     do
         if [ -d ${file} ] || [ -h ${file} ]; then
-            ret=`stat -c "%a" ${file}`
+            ret=$(stat -c "%a" ${file})
             if [ ${ret} -ne 750 ]; then
                 chmod 750 ${file}
                 if [ $? == 0 ]; then
@@ -563,7 +582,7 @@ function limit_system_files() {
     for file in /etc/security /etc/shadow 
     do
         if [ -f ${file} ] || [ -d ${file} ]; then
-            ret=`stat -c "%a" ${file}`
+            ret=$(stat -c "%a" ${file})
             if [ ${ret} -ne 600 ]; then
                 chmod 600 ${file}
                 if [ $? == 0 ]; then
@@ -582,7 +601,7 @@ function limit_system_files() {
     for file in /etc/group /etc/services
     do
         if [ -f ${file} ]; then
-            ret=`stat -c "%a" ${file}`
+            ret=$(stat -c "%a" ${file})
             if [ ${ret} -ne 644 ]; then
                 chmod 644 ${file}
                 if [ $? == 0 ]; then
@@ -594,6 +613,22 @@ function limit_system_files() {
             fi
         else
             log "ERROR" "${file}' not exist"
+        fi
+    done
+
+    # limit
+    for file in /etc/grub.conf /boot/grub/grub.conf /etc/lilo.conf /etc/grub2.cfg /boot/grub2/grub.cfg
+    do
+        if [ -f ${file} ] && [ ! -L ${file} ]; then
+            ret=$(stat -c "%a" ${file})
+            echo "chmod ${ret} ${file}" >> ${RECOVER_COMMANDS}
+            if chmod 600 ${file}; then
+                log "SUCCESS" "Successfully chmod 600 ${file}"
+            else
+                log "ERROR" "Failed to chmod 600 ${file}"
+            fi
+        else
+            log "WARRN" "${file} does not exist or is not hard link file"
         fi
     done
 }
@@ -610,15 +645,14 @@ function umask_profile() {
     for file in /etc/bashrc /etc/csh.cshrc /etc/profile /etc/csh.login /etc/login.defs
     do
         if [ -f ${file} ]; then
-            grep -v '^#' ${file} | grep -i -E 'umask.*.[0-9]{3}' > /dev/null
-            if [ $? != 0 ]; then
-                # \1 means captured group
-                sed -i -r 's/(umask.*)[0-9]{3}$/\1077/Ig' ${file}
-                if [ $? == 0 ]; then
-                    log "SUCCESS" "${file} set 'umask 077'"
-                fi
+            # grep -v '^#' ${file} | grep -i -E 'umask.*.[0-9]{3}' > /dev/null
+
+            # \1 means captured group
+            sed -i -r 's/(umask.*)[0-9]{3}$/\1077/Ig' ${file}
+            if [ $? == 0 ]; then
+                log "SUCCESS" "${file} set 'umask 077'"
             else
-                log "INFO" "${file} already set 'umask 077'"
+                log "ERROR" "${file} failed to set 'umask 077'"
             fi
         else
             log "ERROR" "${file} does not exist"
@@ -694,6 +728,61 @@ function drop_centos_user() {
     
 }
 
+function configure_kernel_parameters() {
+    ###
+     # @description: 修改内核参数
+     # @param {*}
+     # @return {*}
+    ###    
+    FILE="/etc/sysctl.conf"
+    if [ -f ${FILE} ]; then
+        sed -ri "s/^(net.ipv4.conf.all.send_redirects.*)//g" ${FILE}
+        if echo "net.ipv4.conf.all.send_redirects=0" >> ${FILE}; then
+            log "SUCCESS" "set kernel net.ipv4.conf.all.send_redirects=0"
+        fi
+        
+        sed -ri "s/^(net.ipv4.conf.all.accept_redirects.*)//g" ${FILE}
+        if echo "net.ipv4.conf.all.accept_redirects=0" >> ${FILE}; then
+            log "SUCCESS" "set kernel net.ipv4.conf.all.accept_redirects=0"
+        fi
+        if /sbin/sysctl -p >/dev/null 2>&1; then
+            log "SUCCESS" "Successfully load kernel parameters"
+        else
+            log "ERROR" "Failed to load kernel parameters"
+        fi
+    else
+        log "WARRN" "${FILE} does not exist"
+    fi
+}
+
+function configure_pam_limis () {
+    ###
+     # @description: 修改 pam_limits 参数
+     # @param {*}
+     # @return {*}
+    ###    
+    FILE="/etc/security/limits.conf"
+    if [ -f ${FILE} ]; then
+        if grep -E "\*\s*soft\s*core\s*[0-9]*" ${FILE} >/dev/null; then
+             sed -ri "s/.*(\*\s*soft\s*core\s*)([0-9]*)/\10/g" ${FILE}
+             log "SUCCESS" "Successfully to set soft limits"
+        else
+            echo "*               soft    core            0" >> ${FILE}
+            log "SUCCESS" "Successfully to set soft limits"
+        fi
+
+        if grep -E "\*\s*hard\s*core\s*[0-9]*" ${FILE} >/dev/null; then
+             sed -ri "s/.*(\*\s*hard\s*core\s*)([0-9]*)/\10/g" ${FILE}
+             log "SUCCESS" "Successfully to set hard limits"
+        else
+            echo "*               hard    core            0" >> ${FILE}
+            log "SUCCESS" "Successfully to set hard limits"
+        fi
+    else
+        log "WARRN" "${FILE} does not exist"
+    fi
+}
+
 function help() {
     ###
      # @description: 打印脚本帮助
@@ -722,8 +811,7 @@ trap 'tput sgr0' ERR exit
 trap 'recovery' ERR
 
 if [ $# -ne 1 ]; then
-    printf "error options...\n\n"
-    printf "see usage: ${0} -h\n"
+    help
     exit 1
 fi
 
@@ -752,8 +840,10 @@ case $1 in
         immutable_user_conf_file
         drop_risky_file
         disable_telnet_login
+        configure_kernel_parameters
+        configure_pam_limis
         ;;
     *)
-        printf "error options...\n\n"
-        printf "see usage: ${0} -h\n"
+        help
+        ;;
 esac
