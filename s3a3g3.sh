@@ -27,19 +27,20 @@
  # @Author: John Wong
  # @Date: 2021-06-01 11:34:15
  # @LastEditors: John Wong
- # @LastEditTime: 2021-07-19 22:38:29
+ # @LastEditTime: 2021-07-21 14:27:13
  # @FilePath: /s3a3g3/s3a3g3.sh
  # @Desc: Description
- # @Version: v0.3
+ # @Version: v0.2
 ###
 
 ### Terminal settings ###
-set -o errexit # Script exists on first failure, aka set -e
-# set -o undeclared # Script exists on use undeclared variables, aka set -u
-set -o xtrace # For debugging purpose, aka set -x
+#set -o errexit # Script exists on first failure, aka set -e
+#set -o errtrace # aka set -E
+set -o nounset # Script exists on use nounset variables, aka set -u
+# set -o xtrace # For debugging purpose, aka set -x
 
 ### Global Variables ###
-declare readonly SCRIPT_VERSION='v0.3'
+declare readonly SCRIPT_VERSION='v0.2'
 declare RESTART_FLAG=1
 declare OS_TYPE='unknow'
 declare OS_VER='unknow'
@@ -53,11 +54,10 @@ declare readonly BASH_TMOUT=600
 declare readonly BACKUP_DIR_NAME="$(basename $0 .sh)-backup"
 # 复原命令
 declare readonly RECOVER_COMMANDS="$(basename $0 .sh)-backup/recover_commands.sh"
-# 临时文件
-declare readonly TMPFILE=$(mktemp)
 # 原文件
 declare -a readonly ORIGIN_FILEPATHS=(
     "/etc/pam.d/system-auth"
+    "/etc/pam.d/system-auth-ac"
     "/etc/pam.d/common-password"
     "~/.ssh/authorized_keys"
     "/etc/pam.d/sshd"
@@ -69,6 +69,7 @@ declare -a readonly ORIGIN_FILEPATHS=(
     "/etc/csh.login"
     "/etc/pam.d/su"
     "/etc/login.defs"
+    "/etc/security/pwquality.conf"
 )
 
 function log() {
@@ -171,11 +172,9 @@ function get_os_type() {
             log "ERROR" "Unsupported OS release, script exists"
             exit 1
         fi
-    # elif [ -f "/etc/debian_version" ]; then
-    #     distroname="Debian $(cat /etc/debian_version)"
     elif [ -f "/etc/redhat-release" ]; then
         OS_TYPE=$(sed -nr "s/^(.*) (release) (.*) \((.*)\)/\1/ip" /etc/redhat-release)
-        OS_VER=$(sed -nr "s/^(.*) (release) (.*) \((.*)\)/\3/ip" /etc/redhat-release)
+        OS_VER=$(sed -nr "s/^.*([0-9])\.([0-9]).*/\1/ip" /etc/redhat-release)
         OS_PRETTY_NAME=$(sed -nr "s/^(.*) (release) (.*) \((.*)\)/\1 \2 \3 \4/ip" /etc/redhat-release)
         log "INFO" "Current OS release: ${OS_PRETTY_NAME}"
         if [ ${OS_VER} == 6 ] || [ ${OS_VER} == 7 ]; then
@@ -227,26 +226,46 @@ function backup(){
                     log "ERROR" "Backup procedure terminated, please check log"
                     exit 1
                 fi
+            else
+                log "WARRN" "${filepath} does not exist"
             fi
         done
+        if [ ! -f ${RECOVER_COMMANDS} ];then
+            touch "${RECOVER_COMMANDS}"
+            if [ $? == 0 ]; then
+                log "SUCCESS" "Create recover command file"
+            fi
+        else
+            mv "${RECOVER_COMMANDS}" "${RECOVER_COMMANDS}.$(date +'%Y%m%d%H%M%S')"
+            log "INFO" "Move ${RECOVER_COMMANDS} to ${RECOVER_COMMANDS}.$(date +'%Y%m%d%H%M%S')"
+            touch "${RECOVER_COMMANDS}"
+            if [ $? == 0 ]; then
+                log "SUCCESS" "Create recover command file"
+            fi
+        fi
     else
-        log "WARRN" "Backup directory already exists, to aviod overwriting, script exists"
-        exit 1
+        log "WARRN" "Backup directory already exists..."
+        read -p "Overwrite or move to new name ? [m|move (default), o|overwrite, c|cancel] > " selected
+        selected=${selected:-move}
+        case "${selected}" in
+            "o"|"overwrite")
+                rm -rf ${BACKUP_DIR_NAME}
+                backup
+                ;;
+            "m"|"move")
+                mv "${BACKUP_DIR_NAME}" "${BACKUP_DIR_NAME}-$(date +'%Y%m%d%H%M')"
+                backup
+                ;;
+            "c"|"cancel")
+                exit 0
+                ;;
+            *)
+                log "WARRN" "Wrong value (m, o, c)"
+                backup
+                ;;
+        esac
     fi
 
-    if [ ! -f ${RECOVER_COMMANDS} ];then
-        touch "${RECOVER_COMMANDS}"
-        if [ $? == 0 ]; then
-            log "SUCCESS" "Create recover command file"
-        fi
-    else
-        mv "${RECOVER_COMMANDS}" "${RECOVER_COMMANDS}.$(date +'%Y%m%d%H%M%S')"
-        log "INFO" "Move ${RECOVER_COMMANDS} to ${RECOVER_COMMANDS}.$(date +'%Y%m%d%H%M%S')"
-        touch "${RECOVER_COMMANDS}"
-        if [ $? == 0 ]; then
-            log "SUCCESS" "Create recover command file"
-        fi
-    fi
 }
 
 function recovery(){
@@ -272,8 +291,10 @@ function recovery(){
         fi
     done
 
+    bash ${RECOVER_COMMANDS}
+
     # reset terminal environment
-    source /etc/profile
+    # source /etc/profile 2>/dev/null
 }
 
 function password_complexity(){
@@ -293,55 +314,41 @@ function password_complexity(){
         exit 1
     fi
 
-    grep -E "^password.*requisite.*pam_cracklib.so" ${config}  > /dev/null
+    sed -ri "s/^(password.*requisite.*pam_.*\.so)(.*)(difok=.?.?\s?)(.*)/\1\2\4/g" ${config} > /dev/null
+    sed -ri "s/^(password.*requisite.*pam_.*\.so)(.*)(minlen=.?.?\s?)(.*)/\1\2\4/g" ${config} > /dev/null
+    sed -ri "s/^(password.*requisite.*pam_.*\.so)(.*)(ucredit=.?.?\s?)(.*)/\1\2\4/g" ${config} > /dev/null
+    sed -ri "s/^(password.*requisite.*pam_.*\.so)(.*)(lcredit=.?.?\s?)(.*)/\1\2\4/g" ${config} > /dev/null
+    sed -ri "s/^(password.*requisite.*pam_.*\.so)(.*)(dcredit=.?.?\s?)(.*)/\1\2\4/g" ${config} > /dev/null
+    sed -ri "s/^(password.*requisite.*pam_.*\.so)(.*)(ocredit=.?.?\s?)(.*)/\1\2\4/g" ${config} > /dev/null
+    sed -ri "s/^(password.*requisite.*pam_.*\.so)(.*)(enforce_for_root\s?)(.*)/\1\2\4/g" ${config} > /dev/null
+
+    sed -ri "s/^(password.*requisite.*pam_.*\.so)(.*)$/\1\2 difok=3 minlen=8 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1 enforce_for_root/g" ${config}
     if [ $? == 0 ];then
-        sed -i "s/^password.*requisite.*pam_cracklib\.so.*$/password    requisite       pam_cracklib.so retry=3 difok=3 minlen=8 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1 remember=5/g" ${config}
-        log "SUCCESS" "Password complexity: retry=3 difok=3 minlen=8 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1 remember=5"
+        log "SUCCESS" "Password complexity: difok=3 minlen=8 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1 enforce_for_root"
     else
-        grep -E "pam_pwquality\.so" ${config} > /dev/null
-        if [ $? == 0 ];then
-            sed -i "s/password.*requisite.*pam_pwquality\.so.*$/password     requisite       pam_pwquality.so retry=3 difok=3 minlen=8 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1 remember=5/g" ${config}
-            log "SUCCESS" "Password complexity: retry=3 difok=3 minlen=8 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1 remember=5"
-        else
-            echo 'password      requisite       pam_cracklib.so retry=3 difok=3 minlen=12 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1 remember=5' >> ${config}
-            log "SUCCESS" "Password complexity: retry=3 difok=3 minlen=8 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1 remember=5"
-        fi
+        log "ERROR" "Failed to set password complexity..."
+        exit 1
     fi
 
-    grep -E '^PASS_MAX_DAYS.*90' /etc/login.defs > /dev/null
-    if [ $? != 0 ];then
-        sed -i "s/^PASS_MAX_DAYS.*/PASS_MAX_DAYS 90/g" /etc/login.defs
-        if [ $? == 0 ] ;then
-            log "SUCCESS" "login.defs: set PASS_MAX_DAYS 90"
-        else
-            log "ERROR" "login.defs: failed to set PASS_MAX_DAYS 90"
-        fi
+    sed -ri "s/(PASS_MAX_DAYS\s*)([0-9]*)/\190/g" /etc/login.defs
+    if [ $? == 0 ] ;then
+        log "SUCCESS" "login.defs: set PASS_MAX_DAYS 90"
     else
-        log "INFO" "login.defs: already set PASS_MAX_DAYS 90"
+        log "ERROR" "login.defs: failed to set PASS_MAX_DAYS 90"
     fi
 
-    grep -E '^PASS_MIN_DAYS.*6' /etc/login.defs > /dev/null
-    if [ $? != 0 ];then
-        sed -i "s/^PASS_MIN_DAYS.*/PASS_MIN_DAYS 6/g" /etc/login.defs
-        if [ $? == 0 ] ;then
-            log "SUCCESS" "login.defs: set PASS_MIN_DAYS 6"
-        else
-            log "ERROR" "login.defs: failed to set PASS_MIN_DAYS 6"
-        fi
+    sed -ri "s/(PASS_MIN_DAYS\s*)([0-9]*)/\16/g" /etc/login.defs
+    if [ $? == 0 ] ;then
+        log "SUCCESS" "login.defs: set PASS_MIN_DAYS 6"
     else
-        log "INFO" "login.defs: already set PASS_MIN_DAYS 6"
+        log "ERROR" "login.defs: failed to set PASS_MIN_DAYS 6"
     fi
 
-    grep -E '^PASS_WARN_AGE.*30' /etc/login.defs > /dev/null
-    if [ $? != 0 ];then
-        sed -i "s/^PASS_WARN_AGE.*/PASS_WARN_AGE 30/g" /etc/login.defs
-        if [ $? == 0 ] ;then
-            log "SUCCESS" "login.defs: set PASS_WARN_AGE 30"
-        else
-            log "ERROR" "login.defs: failed to set PASS_WARN_AGE 30"
-        fi
+    sed -ri "s/(PASS_WARN_AGE\s*)([0-9]*)/\130/g" /etc/login.defs
+    if [ $? == 0 ] ;then
+        log "SUCCESS" "login.defs: set PASS_WARN_AGE 30"
     else
-        log "INFO" "login.defs: already set PASS_WARN_AGE 30"
+        log "ERROR" "login.defs: failed to set PASS_WARN_AGE 30"
     fi
 }
 
@@ -385,16 +392,18 @@ function limit_su(){
     fi
     
     if add2wheel;then
-        egrep -v "^#.*" ${sufile} | egrep "^auth.*required.*pam_wheel.so.*$" > /dev/null
-        if [ $? == 0 ];then
-            egrep -v "^#.*" ${sufile} | egrep "^auth.*required.*pam_wheel.so.*group=wheel" > /dev/null
-            if [ $? == 0 ];then
-                log "INFO" "Already limit non-wheel group user su to root"
-            else
-                sed -i 's/^auth.*required.*pam_wheel.so.*$/& group=wheel/g' ${sufile}
-            fi
+        if sed -ri "s/^.*(auth\s*required\s*pam_wheel.so\s*use_uid)$/\1 group=wheel/g" ${sufile}; then
+            log "SUCCESS" "require a user to be in the 'wheel' group"
         else
-            echo 'auth		required	pam_wheel.so group=wheel' >> ${sufile}
+            echo 'auth		required	pam_wheel.so use_uid group=wheel/g' >> ${sufile}
+            log "SUCCESS" "require a user to be in the 'wheel' group"
+        fi
+
+        if sed -ri "s/^.*(auth\s*sufficient\s*pam_wheel.so\s*trust use_uid)$/\1 group=wheel/g" ${sufile}; then
+            log "SUCCESS" "implicitly trust users in the 'wheel' group"
+        else
+            echo 'auth		sufficient	pam_wheel.so trust use_uid group=wheel/g' >> ${sufile}
+            log "SUCCESS" "require a user to be in the 'wheel' group"
         fi
     else
         log "ERROR" "Failed to limit non-wheel group user su to root"
@@ -491,7 +500,6 @@ function set_bash_history_tmout(){
     if [ $? == 0 ];then
         log "SUCCESS" "Successfully set 'TMOUNT=${BASH_TMOUT}'"
     fi
-    source /etc/profile
 }
 
 function immutable_user_conf_file() {
@@ -668,65 +676,84 @@ function disable_telnet_login() {
     fi
 }
 
+function drop_centos_user() {
+    ###
+     # @description: 删除图形化安装系统时创建的 centos 用户
+     # @param {*}
+     # @return {*}
+    ###
+    if $(cat /etc/passwd | grep centos > /dev/null); then
+        if $(userdel -r centos); then
+            log "SUCCESS" "Delete user 'centos'"
+        else
+            log "ERROR" "Could not delete user 'centos'"
+        fi
+    else
+        log "INFO" "'centos' user does not exist, no need to delete"
+    fi
+    
+}
+
 function help() {
     ###
      # @description: 打印脚本帮助
      # @param {*}
      # @return {*}
     ###    
-    declare readonly info = "
+    declare readonly info=$(cat <<EOF
 等保3级基线配置脚本 - by John Wong (john-wong@outlook.com)
 
-s3a3g3 version: ${SCRIPT_VERSION}
-Usage: s3a3g3.sh [-?hba]
+version: ${SCRIPT_VERSION}
+
+Usage: s3a3g3.sh [-hrba]
 
 Options:
-  -?,-h,--help        : this help
+  -h,--help           : this help
   -r,--recovery       : recover all the changes
   -b,--backup         : backup configure files
   -a,--apply          : apply settings
-"
-    printf ${info}
+EOF
+)
+    printf "${info}\n\n"
 }
 
-function main(){
-    ###
-     # @description: main function
-     # @param {*}
-     # @return {*}
-    ###
-    get_os_type
-    if [ $# == 1 ]; then
-        case $1 in
-            "-h"| "-?"|"--help")
-                help
-                ;;
-            "-r"|"--recovery")
-                recovery
-                ;;
-            "-b"|"--backup")
-                backup
-                ;;
-            "-a"|"--apply")
-                backup
-                password_complexity
-                limit_su
-                secure_sshd
-                set_bash_history_tmout
-                limit_system_files
-                umask_profile
-                immutable_user_conf_file
-                drop_risky_file
-                disable_telnet_login
-                ;;
-        esac
-    else
+### trap
+trap 'tput sgr0' ERR exit
+trap 'recovery' ERR
+
+if [ $# -ne 1 ]; then
+    printf "error options...\n\n"
+    printf "see usage: ${0} -h\n"
+    exit 1
+fi
+
+case $1 in
+    "-h"| "--help")
         help
-    fi
-}
-
-
-### main entry
-trap 'rm ${TMPFILE}' err exit
-trap recovery err exit
-main
+        ;;
+    "-r"|"--recovery")
+        get_os_type
+        recovery
+        ;;
+    "-b"|"--backup")
+        get_os_type
+        backup
+        ;;
+    "-a"|"--apply")
+        get_os_type
+        backup
+        drop_centos_user
+        password_complexity
+        limit_su
+        secure_sshd
+        set_bash_history_tmout
+        limit_system_files
+        umask_profile
+        immutable_user_conf_file
+        drop_risky_file
+        disable_telnet_login
+        ;;
+    *)
+        printf "error options...\n\n"
+        printf "see usage: ${0} -h\n"
+esac
