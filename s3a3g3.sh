@@ -27,7 +27,7 @@
  # @Author: John Wong
  # @Date: 2021-06-01 11:34:15
  # @LastEditors: John Wong
- # @LastEditTime: 2021-07-21 16:45:44
+ # @LastEditTime: 2021-07-21 16:51:15
  # @FilePath: /s3a3g3/s3a3g3.sh
  # @Desc: Description
  # @Version: v0.3
@@ -333,9 +333,9 @@ function password_complexity(){
     fi
 
     sed -ri "s/^(password.*sufficient.*pam_unix\.so)(.*)(remember=.?.?\s?)(.*)/\1\2\4/g" ${config} > /dev/null
-    sed -ri "s/^(password.*sufficient.*pam_unix\.so)(.*)$/\1\2 remember=5/g" ${config}
+    sed -ri "s/^(password.*sufficient.*pam_unix\.so)(.*)$/\1\2 remember=6/g" ${config}
     if [ $? == 0 ];then
-        log "SUCCESS" "Password repeat times: remember=5"
+        log "SUCCESS" "Password repeat times: remember=6"
     else
         log "ERROR" "Failed to set password repeat times..."
         exit 1
