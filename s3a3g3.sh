@@ -27,7 +27,7 @@
  # @Author: John Wong
  # @Date: 2021-06-01 11:34:15
  # @LastEditors: John Wong
- # @LastEditTime: 2021-07-26 11:56:15
+ # @LastEditTime: 2021-07-21 16:51:15
  # @FilePath: /s3a3g3/s3a3g3.sh
  # @Desc: Description
  # @Version: v0.3
@@ -717,8 +717,6 @@ function drop_centos_user() {
      # @return {*}
     ###
     if $(cat /etc/passwd | grep centos > /dev/null); then
-        # temporary remove immutable attribute
-        chattr -i /etc/passwd /etc/shadow /etc/gshadow /etc/group
         if $(userdel -r centos); then
             log "SUCCESS" "Delete user 'centos'"
         else
