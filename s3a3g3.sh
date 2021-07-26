@@ -27,10 +27,10 @@
  # @Author: John Wong
  # @Date: 2021-06-01 11:34:15
  # @LastEditors: John Wong
- # @LastEditTime: 2021-07-21 16:51:15
+ # @LastEditTime: 2021-07-26 11:59:27
  # @FilePath: /s3a3g3/s3a3g3.sh
  # @Desc: Description
- # @Version: v0.3
+ # @Version: v0.3.1
 ###
 
 ### Terminal settings ###
@@ -40,7 +40,7 @@ set -o nounset # Script exists on use nounset variables, aka set -u
 # set -o xtrace # For debugging purpose, aka set -x
 
 ### Global Variables ###
-declare readonly SCRIPT_VERSION='v0.3'
+declare readonly SCRIPT_VERSION='v0.3.1'
 declare RESTART_FLAG=1
 declare OS_TYPE='unknow'
 declare OS_VER='unknow'
@@ -717,6 +717,8 @@ function drop_centos_user() {
      # @return {*}
     ###
     if $(cat /etc/passwd | grep centos > /dev/null); then
+        # temporary remove immutable attr
+        chattr -i /etc/passwd /etc/group /etc/gshadow /etc/shadow
         if $(userdel -r centos); then
             log "SUCCESS" "Delete user 'centos'"
         else
