@@ -27,7 +27,7 @@
  # @Author: John Wong
  # @Date: 2021-06-01 11:34:15
  # @LastEditors: John Wong
- # @LastEditTime: 2021-07-28 16:07:21
+ # @LastEditTime: 2021-07-28 16:10:37
  # @FilePath: /s3a3g3/s3a3g3.sh
  # @Desc: Description
  # @Version: v0.4
@@ -877,6 +877,7 @@ case $1 in
         disable_telnet_login
         configure_kernel_parameters
         configure_pam_limis
+        secure_logging_file
         ;;
     *)
         help
