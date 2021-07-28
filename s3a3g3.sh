@@ -27,10 +27,10 @@
  # @Author: John Wong
  # @Date: 2021-06-01 11:34:15
  # @LastEditors: John Wong
- # @LastEditTime: 2021-07-26 11:59:27
+ # @LastEditTime: 2021-07-28 16:07:21
  # @FilePath: /s3a3g3/s3a3g3.sh
  # @Desc: Description
- # @Version: v0.3.1
+ # @Version: v0.4
 ###
 
 ### Terminal settings ###
@@ -40,7 +40,7 @@ set -o nounset # Script exists on use nounset variables, aka set -u
 # set -o xtrace # For debugging purpose, aka set -x
 
 ### Global Variables ###
-declare readonly SCRIPT_VERSION='v0.3.1'
+declare readonly SCRIPT_VERSION='v0.4'
 declare RESTART_FLAG=1
 declare OS_TYPE='unknow'
 declare OS_VER='unknow'
@@ -48,7 +48,7 @@ declare OS_VER_LIKE='unknow'
 declare OS_PRETTY_NAME='unknow'
 # 操作日志
 declare LOG_FILE="$(basename $0 .sh).log"
-declare readonly BASH_HISTORY_SIZE=10000
+declare readonly BASH_HISTORY_SIZE=5
 declare readonly BASH_TMOUT=600
 # 备份目录
 declare readonly BACKUP_DIR_NAME="$(basename $0 .sh)-backup"
@@ -782,6 +782,39 @@ function configure_pam_limis () {
         fi
     else
         log "WARRN" "${FILE} does not exist"
+    fi
+}
+
+function secure_logging_file() {
+    ###
+     # @description: 加固日志文件
+     # @param {*}
+     # @return {*}
+    ###
+    lsattr /var/log/messages | grep "^.*a.*\s/var/log/messages$" > /dev/null
+    if [ $? == 0 ]; then
+        log "INFO" "/var/log/messages already has 'a' attribute"
+    else
+        chattr +a /var/log/messages > /dev/null
+        if [ $? == 0 ]; then
+            log "SUCCESS" "Successfully add 'a' attribute to /var/log/messages"
+            echo "chattr -a /var/log/messages" >> ${RECOVER_COMMANDS}
+        else
+            log "ERROR" "Failed to add 'a' attribute to /var/log/messages"
+        fi
+    fi
+
+    lsattr /etc/logrotate.conf | grep "^.*i.*\s/etc/logrotate.conf$" > /dev/null
+    if [ $? == 0 ]; then
+        log "INFO" "/etc/logrotate.conf already has 'i' attribute"
+    else
+        chattr +i /etc/logrotate.conf > /dev/null
+        if [ $? == 0 ]; then
+            log "SUCCESS" "Successfully add 'i' attribute to /etc/logrotate.conf"
+            echo "chattr -i /etc/logrotate.conf" >> ${RECOVER_COMMANDS}
+        else
+            log "ERROR" "Failed to add 'i' attribute to /etc/logrotate.conf"
+        fi
     fi
 }
 
