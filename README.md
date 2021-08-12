@@ -9,8 +9,6 @@
 日志输出有四种状态，分别是 `INFO`, `WARRN`, `ERROR`, `SUCCESS`
 需要留意的是 `ERROR` 状态，`INFO` 以及 `WARRN` 状态影响不大，可以忽略
 
-使用过程中要是遇到问题，及时反应给我(huangqw@xmeport.cn)
-
 示例
 
 ```bash
