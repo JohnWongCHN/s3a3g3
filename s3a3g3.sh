@@ -27,10 +27,10 @@
  # @Author: John Wong
  # @Date: 2021-06-01 11:34:15
  # @LastEditors: John Wong
- # @LastEditTime: 2021-07-28 16:10:37
+ # @LastEditTime: 2021-08-17 16:40:18
  # @FilePath: /s3a3g3/s3a3g3.sh
  # @Desc: Description
- # @Version: v0.4
+ # @Version: v0.4.1
 ###
 
 ### Terminal settings ###
@@ -40,7 +40,7 @@ set -o nounset # Script exists on use nounset variables, aka set -u
 # set -o xtrace # For debugging purpose, aka set -x
 
 ### Global Variables ###
-declare readonly SCRIPT_VERSION='v0.4'
+declare readonly SCRIPT_VERSION='v0.4.1'
 declare RESTART_FLAG=1
 declare OS_TYPE='unknow'
 declare OS_VER='unknow'
@@ -163,8 +163,8 @@ function get_os_type() {
         OS_VER_LIKE=${ID_LIKE}
         OS_PRETTY_NAME=${PRETTY_NAME}
         log "INFO" "Current OS release: ${OS_PRETTY_NAME}"
-        if [[ "${OS_VER_LIKE}" =~ "rhel" ]]; then
-            if [ ${OS_VER} == 6 ] || [ ${OS_VER} == 7 ]; then
+        if [[ "${OS_VER_LIKE}" =~ "rhel" ]] || [[ "${OS_VER_LIKE}" =~ "fedora" ]]; then
+            if [ ${OS_VER::1} == 6 ] || [ ${OS_VER::1} == 7 ]; then
                 log "SUCCESS" "Supported OS release: ${OS_VER}"
             else
                 log "WARRN" "Untested OS release: ${OS_VER}"
@@ -179,7 +179,7 @@ function get_os_type() {
         OS_VER=$(sed -nr "s/^.*([0-9])\.([0-9]).*/\1/ip" /etc/redhat-release)
         OS_PRETTY_NAME=$(sed -nr "s/^(.*) (release) (.*) \((.*)\)/\1 \2 \3 \4/ip" /etc/redhat-release)
         log "INFO" "Current OS release: ${OS_PRETTY_NAME}"
-        if [ ${OS_VER} == 6 ] || [ ${OS_VER} == 7 ]; then
+        if [ ${OS_VER::1} == 6 ] || [ ${OS_VER::1} == 7 ]; then
             log "SUCCESS" "Supported OS release: ${OS_VER}"
         else
             log "WARRN" "Untested OS release: ${OS_VER}"
