@@ -27,10 +27,10 @@
  # @Author: John Wong
  # @Date: 2021-06-01 11:34:15
  # @LastEditors: John Wong
- # @LastEditTime: 2021-08-17 16:40:18
+ # @LastEditTime: 2021-11-04 10:19:58
  # @FilePath: /s3a3g3/s3a3g3.sh
  # @Desc: Description
- # @Version: v0.4.1
+ # @Version: v0.4.2
 ###
 
 ### Terminal settings ###
@@ -155,26 +155,7 @@ function get_os_type() {
     
     log "INFO" "Getting OS type..."
     
-    if [ -f "/etc/os-release" ]; then
-        # freedesktop.org and systemd
-        . /etc/os-release
-        OS_TYPE=${NAME}
-        OS_VER=${VERSION_ID}
-        OS_VER_LIKE=${ID_LIKE}
-        OS_PRETTY_NAME=${PRETTY_NAME}
-        log "INFO" "Current OS release: ${OS_PRETTY_NAME}"
-        if [[ "${OS_VER_LIKE}" =~ "rhel" ]] || [[ "${OS_VER_LIKE}" =~ "fedora" ]]; then
-            if [ ${OS_VER::1} == 6 ] || [ ${OS_VER::1} == 7 ]; then
-                log "SUCCESS" "Supported OS release: ${OS_VER}"
-            else
-                log "WARRN" "Untested OS release: ${OS_VER}"
-                exit 1
-            fi
-        else
-            log "ERROR" "Unsupported OS release, script exists"
-            exit 1
-        fi
-    elif [ -f "/etc/redhat-release" ]; then
+    if [ -f "/etc/redhat-release" ]; then
         OS_TYPE=$(sed -nr "s/^(.*) (release) (.*) \((.*)\)/\1/ip" /etc/redhat-release)
         OS_VER=$(sed -nr "s/^.*([0-9])\.([0-9]).*/\1/ip" /etc/redhat-release)
         OS_PRETTY_NAME=$(sed -nr "s/^(.*) (release) (.*) \((.*)\)/\1 \2 \3 \4/ip" /etc/redhat-release)
