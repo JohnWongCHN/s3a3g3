@@ -27,7 +27,7 @@
  # @Author: John Wong
  # @Date: 2021-06-01 11:34:15
  # @LastEditors: John Wong
- # @LastEditTime: 2021-11-04 10:19:58
+ # @LastEditTime: 2022-02-08 08:48:23
  # @FilePath: /s3a3g3/s3a3g3.sh
  # @Desc: Description
  # @Version: v0.4.2
@@ -40,7 +40,7 @@ set -o nounset # Script exists on use nounset variables, aka set -u
 # set -o xtrace # For debugging purpose, aka set -x
 
 ### Global Variables ###
-declare readonly SCRIPT_VERSION='v0.4.1'
+declare readonly SCRIPT_VERSION='v0.4.2'
 declare RESTART_FLAG=1
 declare OS_TYPE='unknow'
 declare OS_VER='unknow'
