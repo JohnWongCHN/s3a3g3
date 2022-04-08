@@ -1,6 +1,10 @@
 # 等保 3 级基线配置脚本
 
-目前仅支持 Redhat 6,7 系列发行版
+## 更新历史
+
+- ⚙️ 2022-04-08, 重构代码，加入 RHEL 8 发行版支持，添加网络加固功能（防火墙 SSH 白名单，ICMP 白名单），添加执行权限检查（非 root/sudo 权限无法执行脚本）
+
+目前仅支持 Redhat 6,7,8 系列发行版
 
 ## 使用说明
 
@@ -40,62 +44,74 @@ Overwrite or move to new name ? [m|move (default), o|overwrite, c|cancel] > m
 
 ### 执行方式
 
-* 脚本不添加执行权限
+- 脚本不添加执行权限
   
 ```bash
 [root@xxxx ~]# bash s3a3g3.sh -h
-等保3级基线配置脚本 - by John Wong (john-wong@outlook.com)
+s3a3g3.sh ver. 0.5.0
+等保3级基线配置脚本
 
-s3a3g3 version: v0.2
-Usage: s3a3g3.sh [-hrba]
+Usage: s3a3g3.sh [-h|--help]
+       s3a3g3.sh [-r|--recovery] [-b|--backup] [-a|--apply] [-s|--secure-network]
 
-Options:
-  -h,--help           : this help
-  -r,--recovery       : recover all the changes
-  -b,--backup         : backup configure files
-  -a,--apply          : apply settings
+  Options:
+  -h, --help                  Display this help message and exit.
+  -r, --recovery              recover all the changes
+  -b, --backup                backup configure files
+  -a, --apply                 apply settings
+  -s, --secure-network        secure network configuration (firewalld, not support iptables)
+
+  NOTE: You must be the superuser to run this script.
 
 ```
 
-* 脚本添加执行权限
+- 脚本添加执行权限
 
 ```bash
 [root@xxxx ~]# chmod +x s3a3g3.sh
 [root@xxxx ~]# ./s3a3g3.sh -h
-等保3级基线配置脚本 - by John Wong (john-wong@outlook.com)
+s3a3g3.sh ver. 0.5.0
+等保3级基线配置脚本
 
-s3a3g3 version: v0.2
-Usage: s3a3g3.sh [-hrba]
+Usage: s3a3g3.sh [-h|--help]
+       s3a3g3.sh [-r|--recovery] [-b|--backup] [-a|--apply] [-s|--secure-network]
 
-Options:
-  -h,--help           : this help
-  -r,--recovery       : recover all the changes
-  -b,--backup         : backup configure files
-  -a,--apply          : apply settings
+  Options:
+  -h, --help                  Display this help message and exit.
+  -r, --recovery              recover all the changes
+  -b, --backup                backup configure files
+  -a, --apply                 apply settings
+  -s, --secure-network        secure network configuration (firewalld, not support iptables)
+
+  NOTE: You must be the superuser to run this script.
 
 ```
 
 ### 参数说明
 
-* `-h, --help` 查看脚本帮助
+- `-h, --help` 查看脚本帮助
 
 ```bash
 [root@xxxx ~]# chmod +x s3a3g3.sh
 [root@xxxx ~]# ./s3a3g3.sh -h
-等保3级基线配置脚本 - by John Wong (john-wong@outlook.com)
+s3a3g3.sh ver. 0.5.0
+等保3级基线配置脚本
 
-s3a3g3 version: v0.2
-Usage: s3a3g3.sh [-hrba]
+Usage: s3a3g3.sh [-h|--help]
+       s3a3g3.sh [-r|--recovery] [-b|--backup] [-a|--apply] [-s|--secure-network]
 
-Options:
-  -h,--help           : this help
-  -r,--recovery       : recover all the changes
-  -b,--backup         : backup configure files
-  -a,--apply          : apply settings
+  Options:
+  -h, --help                  Display this help message and exit.
+  -r, --recovery              recover all the changes
+  -b, --backup                backup configure files
+  -a, --apply                 apply settings
+  -s, --secure-network        secure network configuration (firewalld, not support iptables)
+
+  NOTE: You must be the superuser to run this script.
 
 ```
 
-* `-b,--backup` 备份配置文件
+- `-b,--backup` 备份配置文件
 
 备份配置文件，会在当前目录生产 `s3a3g3-backup` 目录，当已经存在该目录时会提示覆盖该目录还是
 修改原目录名，修改后的文件名类似于 `s3a3g3-backup-202107210905`
@@ -104,7 +120,7 @@ Options:
 [root@xxxx ~]# bash s3a3g3.sh -b
 ```
 
-* `-r,--recovery` 恢复原配置
+- `-r,--recovery` 恢复原配置
 
 恢复原配置将会把 `s3a3g3-backup` 目录中的备份配置文件覆盖原文件
 
@@ -112,10 +128,18 @@ Options:
 [root@xxxx ~]# bash s3a3g3.sh -r
 ```
 
-* `-a,--apply` 应用基线配置
+- `-a,--apply` 应用基线配置
 
 应用所有基线配置
 
 ```bash
 [root@xxxx ~]# bash s3a3g3.sh -a
+```
+
+- `-s,--secure-network` 防火墙加固
+
+网络安全，防火墙架构，设置 SSH 白名单，ICMP Ping 白名单
+
+```bash
+[root@xxxx ~]# bash s3a3g3.sh -s
 ```
