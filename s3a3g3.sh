@@ -19,6 +19,7 @@
 #        s3a3g3.sh [-r|--recovery] [-b|--backup] [-a|--apply] [-s|--secure-network]
 
 # Revision history:
+# 2022-04-08 Refactoring code and add rhel 8 release support. (0.5.0)
 # 2022-04-02 Refactoring script. (0.4.2)
 # ---------------------------------------------------------------------------
 
@@ -30,7 +31,7 @@
 
 ### Global Variables ###
 PROGNAME=${0##*/}
-VERSION="0.4.2"
+VERSION="0.5.0"
 LIBS=     # Insert pathnames of any required external shell libraries here
 
 RESTART_FLAG=1
