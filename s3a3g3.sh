@@ -19,6 +19,7 @@
 #        s3a3g3.sh [-r|--recovery] [-b|--backup] [-a|--apply] [-s|--secure-network]
 
 # Revision history:
+# 2022-05-06 Add ping and ssh whitelist. (0.5.1)
 # 2022-04-08 Refactoring code and add rhel 8 release support. (0.5.0)
 # 2022-04-02 Refactoring script. (0.4.2)
 # ---------------------------------------------------------------------------
@@ -31,7 +32,7 @@
 
 ### Global Variables ###
 PROGNAME=${0##*/}
-VERSION="0.5.0"
+VERSION="0.5.1"
 LIBS=     # Insert pathnames of any required external shell libraries here
 
 RESTART_FLAG=1
@@ -858,6 +859,7 @@ secure_network() {
   local ssh_whitelist=(
     "172.16.3.40"
     "172.16.3.43"
+    "172.16.7.108"
     "192.101.109.80"
     "192.101.109.74"
   )
@@ -865,6 +867,8 @@ secure_network() {
   # ping whitelist 
   local ping_whitelist=(
     "172.16.3.40/30"
+    "172.16.2.49"
+    "172.16.2.59"
     "172.16.7.108"
     "192.101.109.64/27"
   )
