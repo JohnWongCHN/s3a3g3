@@ -19,6 +19,7 @@
 #        s3a3g3.sh [-r|--recovery] [-b|--backup] [-a|--apply] [-s|--secure-network]
 
 # Revision history:
+# 2022-06-06 Fix failed to detect '7.9.2009' os type schema. (0.5.2)
 # 2022-05-06 Add ping and ssh whitelist. (0.5.1)
 # 2022-04-08 Refactoring code and add rhel 8 release support. (0.5.0)
 # 2022-04-02 Refactoring script. (0.4.2)
@@ -32,7 +33,7 @@
 
 ### Global Variables ###
 PROGNAME=${0##*/}
-VERSION="0.5.1"
+VERSION="0.5.2"
 LIBS=     # Insert pathnames of any required external shell libraries here
 
 RESTART_FLAG=1
@@ -210,7 +211,7 @@ get_os_type() {
   
   if [ -f "/etc/redhat-release" ]; then
     OS_TYPE=$(sed -nr "s/^(.*) (release) (.*) \((.*)\)/\1/ip" /etc/redhat-release)
-    OS_VER=$(sed -nr "s/^.*([0-9])\.([0-9]).*/\1/ip" /etc/redhat-release)
+    OS_VER=$(sed -nr "s/^.* release ([0-9])\.([0-9]).*/\1/ip" /etc/redhat-release)
     OS_PRETTY_NAME=$(sed -nr "s/^(.*) (release) (.*) \((.*)\)/\1 \2 \3 \4/ip" /etc/redhat-release)
     log "INFO" "Current OS release: ${OS_PRETTY_NAME}"
     if [ ${OS_VER::1} == 6 ] || [ ${OS_VER::1} == 7 ] || [ ${OS_VER::1} == 8 ]; then
